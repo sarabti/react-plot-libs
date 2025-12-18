@@ -1,11 +1,8 @@
+import NivoIranMap from "./components/geoChart/NivoIranMap";
 import './App.css'
 
 function App() {
-  return (
-    <>
-      <h1>hello</h1>
-    </>
-  )
+  return <NivoIranMap />;
 }
 
-export default App
+export default App;
