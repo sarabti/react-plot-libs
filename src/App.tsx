@@ -1,8 +1,14 @@
 import NivoIranMap from "./components/geoChart/NivoIranMap";
-import './App.css'
+import "./App.css";
+import VisxIranMap from "./components/geoChart/VisxIranMap";
 
 function App() {
-  return <NivoIranMap />;
+  return (
+    <>
+      <VisxIranMap />
+      <NivoIranMap />
+    </>
+  );
 }
 
 export default App;
