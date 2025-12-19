@@ -2,3 +2,9 @@
   margin: 0 auto;
   text-align: center;
 }
+
+.chart-group {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
