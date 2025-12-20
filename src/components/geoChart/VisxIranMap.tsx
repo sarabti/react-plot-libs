@@ -102,7 +102,7 @@ const VisxIranMap = () => {
     <div
       style={{ position: "relative", width: "500px", fontFamily: "sans-serif" }}
     >
-      <h1>Iran Map with Interactive Tooltips</h1>
+      <h1>Iran Map Iran</h1>
 
       <svg width={500} height={450} style={{ overflow: "visible" }}>
         <LinearGradient id="province-gradient" from="#ffffff" to="#E4E4E4" />

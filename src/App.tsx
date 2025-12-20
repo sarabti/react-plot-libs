@@ -2,14 +2,14 @@ import NivoIranMap from "./components/geoChart/NivoIranMap";
 import "./App.css";
 import VisxIranMap from "./components/geoChart/VisxIranMap";
 import { VisxPieChart } from "./components/pieChart/VisxPieChart";
-import { NivoPieChart } from "./components/pieChart/NivoPieChart";
+import VisxBarChart from "./components/barChart/VisxBarChart";
 
 function App() {
   return (
     <>
       <div className="chart-group">
         <VisxPieChart />
-        <NivoPieChart />
+        <VisxBarChart />
       </div>
       <VisxIranMap />
       <NivoIranMap />
