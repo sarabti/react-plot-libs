@@ -109,7 +109,7 @@ export default function VisxBarChartClip() {
     () =>
       scaleLinear<number>({
         range: [INNER_HEIGHT, 0],
-        domain: [0, 100],
+        domain: [0, 110],
       }),
     []
   );
