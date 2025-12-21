@@ -73,7 +73,7 @@ const AnimatedBarGroup = ({ d, barX, barY, barHeight }: any) => {
   );
 };
 
-export default function VisxBarChart() {
+export default function VisxBarChartZoom() {
   const [data, setData] = useState<DataPoint[]>(initialData);
   const [showBrush, setShowBrush] = useState(false);
 
