@@ -4,9 +4,9 @@ import { Bar } from "@visx/shape";
 import { scaleLinear, scaleBand } from "@visx/scale";
 import { useSpring, animated } from "@react-spring/web";
 import { RectClipPath } from "@visx/clip-path";
-import { localPoint } from "@visx/event";
 import { toPng } from "html-to-image";
 import { Zoom } from "@visx/zoom"; // Added
+import { Brush } from "@visx/brush";
 
 const AnimatedBar = animated(Bar);
 const AnimatedText = animated("text");
@@ -93,7 +93,6 @@ export default function VisxBarChartClipAndZoom() {
     x2: number;
     y2: number;
   } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   const xMax = (BAR_WIDTH + BAR_PADDING) * data.length;
   const chartWidth = xMax + MARGIN.left + MARGIN.right;
@@ -117,12 +116,30 @@ export default function VisxBarChartClipAndZoom() {
     []
   );
 
+  const brushXScale = useMemo(
+    () =>
+      scaleLinear({
+        domain: [0, chartWidth],
+        range: [0, chartWidth],
+      }),
+    [chartWidth]
+  );
+
+  const brushYScale = useMemo(
+    () =>
+      scaleLinear({
+        domain: [0, CHART_HEIGHT],
+        range: [0, CHART_HEIGHT],
+      }),
+    []
+  );
+
   const handleExport = async () => {
     if (containerRef.current && selection) {
       try {
         // 1. Calculate the actual top-left and dimensions of the selection
-        const x = Math.min(selection.x1, selection.x2) + MARGIN.left;
-        const y = Math.min(selection.y1, selection.y2) + MARGIN.top;
+        const x = Math.min(selection.x1, selection.x2);
+        const y = Math.min(selection.y1, selection.y2);
         const width = Math.abs(selection.x2 - selection.x1);
         const height = Math.abs(selection.y2 - selection.y1);
 
@@ -130,13 +147,13 @@ export default function VisxBarChartClipAndZoom() {
         const dataUrl = await toPng(containerRef.current, {
           backgroundColor: "#fff",
           // These properties define the "clip" of the export
-          canvasWidth: width,
-          canvasHeight: height,
-          width: width,
-          height: height,
+          canvasWidth: width - 2,
+          canvasHeight: height - 2,
+          width: width - 2,
+          height: height - 2,
           style: {
             // Move the container so the selected area starts at (0,0) in the export
-            transform: `translate(-${x}px, -${y}px)`,
+            transform: `translate(-${x + 2}px, -${y + 2}px)`,
             transformOrigin: "top left",
           },
         });
@@ -187,92 +204,119 @@ export default function VisxBarChartClipAndZoom() {
                 cursor: isCropMode ? "crosshair" : "default",
                 touchAction: "none",
               }}
-              onMouseDown={(e) => {
-                if (!isCropMode) return;
-                const point = localPoint(e);
-                if (!point) return;
-                setIsDragging(true);
-                // Adjust for margins to get local chart coordinates
-                const x = point.x - MARGIN.left;
-                const y = point.y - MARGIN.top;
-                setSelection({ x1: x, y1: y, x2: x, y2: y });
+              onMouseMove={() => {
+                if (isCropMode) return;
               }}
-              onMouseMove={(e) => {
-                if (!isDragging || !selection) return;
-                const point = localPoint(e);
-                if (!point) return;
-                setSelection({
-                  ...selection,
-                  x2: point.x - MARGIN.left,
-                  y2: point.y - MARGIN.top,
-                });
+              onMouseDown={() => {
+                if (isCropMode) return;
               }}
               onMouseUp={() => {
-                setIsDragging(false);
+                if (isCropMode) return;
               }}
             >
-              <rect width={chartWidth} height={CHART_HEIGHT} fill="#fff" />
+              <defs>
+                {/* 1. Define the Mask logic */}
+                <mask id="spotlight-mask">
+                  {/* Everything White is visible (the dark mask) */}
+                  <rect width="100%" height="100%" fill="white" />
 
-              <Group top={MARGIN.top} left={MARGIN.left}>
-                {/* We apply the zoom transform only to the data elements */}
-                <g transform={zoom.toString()}>
-                  <RectClipPath
-                    id="zoom-clip"
-                    width={xMax}
-                    height={INNER_HEIGHT}
-                  />
+                  {/* Everything Black is hidden (the hollow hole) */}
+                  {selection && (
+                    <rect
+                      x={brushXScale(selection.x1)}
+                      y={brushYScale(selection.y1)}
+                      width={Math.abs(
+                        brushXScale(selection.x2) - brushXScale(selection.x1)
+                      )}
+                      height={Math.abs(
+                        brushYScale(selection.y2) - brushYScale(selection.y1)
+                      )}
+                      fill="black"
+                    />
+                  )}
+                </mask>
+              </defs>
 
-                  <Group clipPath="url(#zoom-clip)">
-                    {/* Grid Lines */}
-                    {[0, 20, 40, 60, 80, 100].map((tick) => (
-                      <line
-                        key={`l-${tick}`}
-                        x1={0}
-                        x2={xMax}
-                        y1={yScale(tick)}
-                        y2={yScale(tick)}
-                        stroke="#efefef"
-                        strokeWidth={1 / zoom.transformMatrix.scaleX}
-                      />
-                    ))}
+              {/* We apply the zoom transform only to the data elements */}
+              <g transform={zoom.toString()}>
+                <RectClipPath
+                  id="zoom-clip"
+                  width={xMax}
+                  height={INNER_HEIGHT}
+                />
 
-                    {data.map((d) => (
-                      <AnimatedBarGroup
-                        key={d.month}
-                        d={d}
-                        barX={xScale(d.month) ?? 0}
-                        barY={yScale(d.value) ?? 0}
-                        barHeight={INNER_HEIGHT - (yScale(d.value) ?? 0)}
-                      />
-                    ))}
-                  </Group>
-                </g>
+                <Group
+                  clipPath="url(#zoom-clip)"
+                  top={MARGIN.top}
+                  left={MARGIN.left}
+                >
+                  {/* Grid Lines */}
+                  {[0, 20, 40, 60, 80, 100].map((tick) => (
+                    <line
+                      key={`l-${tick}`}
+                      x1={0}
+                      x2={xMax}
+                      y1={yScale(tick)}
+                      y2={yScale(tick)}
+                      stroke="#efefef"
+                      strokeWidth={1 / zoom.transformMatrix.scaleX}
+                    />
+                  ))}
 
-                {/* UI Selection Overlay (Fixed to screen space, not zoomed) */}
-                {/* {selection && (
-                  <rect
-                    x={Math.min(selection.x1, selection.x2)}
-                    y={0} // To keep vertical visual consistency, though we track Y for logic
-                    width={Math.abs(selection.x2 - selection.x1)}
-                    height={INNER_HEIGHT}
-                    fill="rgba(255, 255, 255, 0.g1)"
-                    stroke="#007bff"
-                    strokeDasharray="4"
-                  />
-                )} */}
-                {/* Secondary horizontal selection indicator */}
-                {selection && isCropMode && (
-                  <rect
-                    x={Math.min(selection.x1, selection.x2)}
-                    y={Math.min(selection.y1, selection.y2)}
-                    width={Math.abs(selection.x2 - selection.x1)}
-                    height={Math.abs(selection.y2 - selection.y1)}
-                    fill="rgba(255, 255, 255, 0.2)"
-                    stroke="#007bff"
-                    style={{ pointerEvents: "none" }}
-                  />
-                )}
-              </Group>
+                  {data.map((d) => (
+                    <AnimatedBarGroup
+                      key={d.month}
+                      d={d}
+                      barX={xScale(d.month) ?? 0}
+                      barY={yScale(d.value) ?? 0}
+                      barHeight={INNER_HEIGHT - (yScale(d.value) ?? 0)}
+                    />
+                  ))}
+                </Group>
+              </g>
+              {/* 2. The Dark Overlay that uses the mask */}
+              {isCropMode && (
+                <rect
+                  width="100%"
+                  height="100%"
+                  fill="black"
+                  fillOpacity={0.4}
+                  mask="url(#spotlight-mask)"
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
+
+              {isCropMode && (
+                <Brush
+                  xScale={brushXScale}
+                  yScale={brushYScale}
+                  width={chartWidth}
+                  height={CHART_HEIGHT}
+                  brushDirection="both"
+                  onChange={(domain) => {
+                    if (domain) {
+                      const { x0, x1, y0, y1 } = domain;
+                      setSelection({ x1: x0, x2: x1, y1: y0, y2: y1 });
+                    }
+                  }}
+                  selectedBoxStyle={{
+                    fill: "transparent", // The square itself is invisible
+                    filter: "drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8))", // Outer glow
+                  }}
+                  brushRegion="chart"
+                  handleSize={8}
+                  resizeTriggerAreas={[
+                    "left",
+                    "right",
+                    "top",
+                    "bottom",
+                    "topLeft",
+                    "topRight",
+                    "bottomLeft",
+                    "bottomRight",
+                  ]}
+                />
+              )}
             </svg>
 
             <div
@@ -307,8 +351,8 @@ export default function VisxBarChartClipAndZoom() {
                   if (selW < 5 || selH < 5) return;
 
                   // Calculate required scale to fit selection to view
-                  const scaleX = xMax / selW;
-                  const scaleY = INNER_HEIGHT / selH;
+                  const scaleX = chartWidth / selW;
+                  const scaleY = CHART_HEIGHT / selH;
                   const newScale = Math.min(scaleX, scaleY);
 
                   // Calculate translation to center the selection
@@ -318,8 +362,8 @@ export default function VisxBarChartClipAndZoom() {
                   zoom.setTransformMatrix({
                     scaleX: newScale,
                     scaleY: newScale,
-                    translateX: xMax / 2 - centerX * newScale,
-                    translateY: INNER_HEIGHT / 2 - centerY * newScale,
+                    translateX: chartWidth / 2 - centerX * newScale,
+                    translateY: CHART_HEIGHT / 2 - centerY * newScale,
                     skewX: 0,
                     skewY: 0,
                   });
